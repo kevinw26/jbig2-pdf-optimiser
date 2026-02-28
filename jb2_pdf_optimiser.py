@@ -15,7 +15,7 @@ from pikepdf import ObjectStreamMode, Name
 from pikepdf import StreamDecodeLevel
 from tqdm import tqdm
 
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 
 
 def save_pdf(pdf, o_path):
