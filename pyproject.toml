@@ -1,7 +1,7 @@
 [project]
 name = "jbig2-pdf-optimiser"
 version = "0.1.0"
-description = "Recompresses 1-bit images in PDFs with global dictionary JBIG2 images"
+description = "Recompress 1-bit images in PDFs with global dictionary JBIG2 images"
 requires-python = ">=3.12"
 dependencies = [
     "pikepdf",
