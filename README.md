@@ -14,3 +14,13 @@ jb2_pdf_optimiser.py INPUT OUTPUT
 ```
 
 See further details with `-h`. The default JBIG2 threshold is `0.8`.
+
+## Comparison
+
+Try this with your own PDFs, but these are some test cases:
+
+| Test case              | Original (CCITT) | Adobe Acrobat  | JBIG2 PDF Optimizer |
+| :--------------------- | :--------------- | :------------- | :------------------ |
+| 1 JPG + 141 CCITT G4   | 9.23 MB          | 1.77 MB (-81%) | 1.46 MB (-85%)      |
+| 1018 local JBIG2 et al | 19.5 MB          | Error          | 13.0 MB (-33%)      |
+| 1 JGB + 484 JBIG2      | Unknown          | 13.0 MB        | 7.71 MB (-41%)      |
