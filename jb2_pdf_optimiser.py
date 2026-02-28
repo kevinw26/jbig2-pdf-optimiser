@@ -104,6 +104,8 @@ class JBIG2PDFOptimiser:
                 fragment_file = path.join(chunk_dir, f'output.{i:04d}')
                 with open(fragment_file, 'rb') as f:
                     compressed_data = f.read()
+                    self.df.loc[idx, 'jb2_lsize'] = len(compressed_data)
+                    self.df.loc[idx, 'jb2_gsize'] = len(symbol_data)
                     self._substitute_jb2global(row['obj_ptr'], compressed_data, jb2_globals)
 
     def optimize(self, save_csv=None):
