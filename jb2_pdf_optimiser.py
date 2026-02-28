@@ -160,7 +160,7 @@ if __name__ == '__main__':
     psr.add_argument('output_pdf')
     psr.add_argument(
         '-t', '--threshold',
-        type=float, default=0.8, help='JBIG2 similarity threshold')
+        type=float, default=0.85, help='JBIG2 similarity threshold')
     psr.add_argument(
         '-c', '--chunk',
         type=int, default=128, help='Number of images per JBIG2 global dictionary')
@@ -169,8 +169,8 @@ if __name__ == '__main__':
     args = psr.parse_args()
 
     # validate inputs
-    if not (0.6 <= args.threshold <= 0.97):
-        psr.error(f'JBIG2 similarity threshold must be between 0.6 and 0.97')
+    if not (0.4 <= args.threshold <= 0.97):
+        psr.error(f'JBIG2 similarity threshold must be between 0.4 and 0.97')
     if shutil.which('jbig2') is None:
         psr.error(
             'Jbig2 executable not found. See https://ocrmypdf.readthedocs.io/en/latest/jbig2.html')
