@@ -11,13 +11,15 @@ from tempfile import TemporaryDirectory
 import numpy as np
 import pandas as pd
 import pikepdf
+from pikepdf import ObjectStreamMode
+from pikepdf import StreamDecodeLevel
 from tqdm import tqdm
 
 
 def save_pdf(pdf, o_path):
     pdf.save(o_path, compress_streams=True, recompress_flate=True,
-             linearize=True, stream_decode_level=pikepdf.StreamDecodeLevel.generalized,
-             object_stream_mode=pikepdf.ObjectStreamMode.generate)
+             linearize=True, stream_decode_level=StreamDecodeLevel.generalized,
+             object_stream_mode=ObjectStreamMode.generate)
 
 
 class JBIG2PDFOptimiser:
