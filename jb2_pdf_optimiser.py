@@ -72,10 +72,6 @@ class JBIG2PDFOptimiser:
                         # like ocrmypdf don't mess with custom decodes
                         continue
 
-                    if obj.Filter == Name.JBIG2Decode and Name.JBIG2Globals in obj.DecodeParms:
-                        # jbig2 image already uses global dictionaries
-                        continue
-
                     img_id = len(rows)
                     pbm_path = path.join(tmp_dir, f'img_{img_id:06d}.pbm')
                     pikepdf.PdfImage(obj).as_pil_image().save(pbm_path)
@@ -127,7 +123,7 @@ class JBIG2PDFOptimiser:
         with TemporaryDirectory() as tmp_dir:
             self.extract_images(tmp_dir)
             if self.df.empty:
-                print('no 1-bit images found')
+                print('no 1-bit optimisable images found')
                 return
 
             self.compress_and_replace(tmp_dir)
