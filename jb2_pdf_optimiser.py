@@ -63,13 +63,17 @@ class JBIG2PDFOptimiser:
 
     def extract_images(self, tmp_dir: str):
         rows = []
-        for obj_num in tqdm(range(1, len(self.pdf.objects)), desc='extracting images'):
+        for obj_num in tqdm(range(1, len(self.pdf.objects)), desc='extracting images from objects'):
             try:
                 obj = self.pdf.get_object(obj_num, 0)
                 if isinstance(obj, pikepdf.Stream) and obj.Subtype == Name.Image \
                         and obj.BitsPerComponent == 1:
                     if Name.Decode in obj:
                         # like ocrmypdf don't mess with custom decodes
+                        continue
+
+                    if obj.Filter == Name.JBIG2Decode and Name.JBIG2Globals in obj.DecodeParms:
+                        # jbig2 image already uses global dictionaries
                         continue
 
                     img_id = len(rows)
@@ -87,7 +91,9 @@ class JBIG2PDFOptimiser:
     def compress_and_replace(self, tmp_dir: str):
         """By chunk create dictionary and re-encode images as JBIG2"""
         chunks = np.array_split(self.df.index, np.ceil(len(self.df) / self.chunk_size))
-        pbar = tqdm(desc='encoding jbig2 images', total=len(self.df))
+        pbar = tqdm(
+            desc=f'encoding jbig2 images in {len(chunks)} chunks of ca {len(chunks[0])} images',
+            total=len(self.df))
         for chunk_id, chunk_idx in enumerate(chunks):
             chunk_df = self.df.loc[chunk_idx]
             chunk_dir = path.join(tmp_dir, f'chunk_{chunk_id}')
@@ -100,6 +106,7 @@ class JBIG2PDFOptimiser:
             ) as proc:
                 for line in proc.stdout:
                     if line.startswith('thresholded'):
+                        # update progress bar as images are encoded; replacement is fast
                         pbar.update()
 
             sym_file = path.join(chunk_dir, 'output.sym')
@@ -111,6 +118,7 @@ class JBIG2PDFOptimiser:
                 fragment_file = path.join(chunk_dir, f'output.{i:04d}')
                 with open(fragment_file, 'rb') as f:
                     compressed_data = f.read()
+                    self.df.loc[idx, 'chunk'] = chunk_id
                     self.df.loc[idx, 'jb2_lsize'] = len(compressed_data)
                     self.df.loc[idx, 'jb2_gsize'] = len(symbol_data)
                     self._substitute_jb2global(row['obj_ptr'], compressed_data, jb2_globals)
@@ -125,11 +133,23 @@ class JBIG2PDFOptimiser:
             self.compress_and_replace(tmp_dir)
             save_pdf(self.pdf, self.output_pdf)
 
+        tqdm.write('pre and post file sizes')
         diffs = JBIG2PDFOptimiser._calc_file_diffs(self.input_pdf, self.output_pdf)
-        print(diffs.to_string(index=False))
+        tqdm.write(diffs.to_string(index=False))
 
         if save_csv is not None:
-            self.df.drop(columns=['obj_ptr']).to_csv(save_csv, index=False)
+            tqdm.write(f'\nsaving diagnostic csv to {save_csv}')
+
+            # clean up chunk from float to int64
+            df = self.df.drop(columns=['obj_ptr'])
+            df['chunk'] = df['chunk'].astype('Int64')
+            df = df.set_index(['chunk', 'pbm_path'])
+
+            # calc estimated savings
+            df['jb2_est_size'] = df['jb2_lsize'] + (
+                    df.groupby('chunk')['jb2_gsize'].mean() / self.df.groupby('chunk').size())
+            df['savings_pc'] = (1 - (df['jb2_est_size'] / df['orig_size'])).mul(100).round(2)
+            df.to_csv(save_csv)
 
 
 if __name__ == '__main__':
@@ -148,6 +168,8 @@ if __name__ == '__main__':
     psr.add_argument(
         '-c', '--chunk',
         type=int, default=128, help='Number of images per JBIG2 global dictionary')
+    psr.add_argument(
+        '--diag-csv', type=str, default=None, help='Path to output CSV with image data')
     args = psr.parse_args()
 
     # validate inputs
@@ -157,9 +179,9 @@ if __name__ == '__main__':
         psr.error(
             'Jbig2 executable not found. See https://ocrmypdf.readthedocs.io/en/latest/jbig2.html')
     if not path.isfile(args.input_pdf):
-        psr.error(f'Input does not exist')
+        psr.error(f'Input PDF does not exist')
 
     JBIG2PDFOptimiser(
         input_pdf=args.input_pdf, output_pdf=args.output_pdf,
         chunk_size=args.chunk, jb2_threshold=args.threshold
-    ).optimize()
+    ).optimize(save_csv=args.diag_csv)
