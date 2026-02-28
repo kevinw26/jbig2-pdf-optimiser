@@ -50,15 +50,18 @@ class JBIG2PDFOptimiser:
         self.df = pd.DataFrame()
 
     def _substitute_jb2global(self, target_obj, new_data, globals_obj):
-        target_obj.write(new_data)
-        target_obj.Filter = pikepdf.Name('/JBIG2Decode')
-        target_obj.DecodeParms = self.pdf.make_indirect({'/JBIG2Globals': globals_obj})
-
-        # Clean up keys from previous compression
-        keys_to_remove = ['/CCITTFaxDecode', '/K', '/Columns', '/Rows']
+        keys_to_remove = [
+            '/Filter', '/DecodeParms', '/CCITTFaxDecode', '/K', '/Columns', '/Rows', '/BlackIs1',
+            '/Decode']
         for key in keys_to_remove:
             if key in target_obj:
                 del target_obj[key]
+
+        target_obj.write(new_data)
+        target_obj.Filter = pikepdf.Name('/JBIG2Decode')
+        target_obj.DecodeParms = self.pdf.make_indirect({
+            '/JBIG2Globals': globals_obj
+        })
 
     def extract_images(self, tmp_dir: str):
         rows = []
