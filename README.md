@@ -9,7 +9,7 @@ However, `ocrmypdf` and Acrobat usually only makes this set of stamps (a symbol 
 
 ## Install and execute
 
-Clone or download the repository. I use `uv`. It can then be run, if you do not already have a Python environment set up, with:
+Clone or download the repository. I use [`uv`](https://github.com/astral-sh/uv). It can then be run, if you do not already have a Python environment set up, with:
 
 ```
 uv run jb2_pdf_optimiser.py INPUT OUTPUT
