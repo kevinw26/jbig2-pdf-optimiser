@@ -11,12 +11,15 @@ from tempfile import TemporaryDirectory
 import numpy as np
 import pandas as pd
 import pikepdf
-from pikepdf import ObjectStreamMode
+from pikepdf import ObjectStreamMode, Name
 from pikepdf import StreamDecodeLevel
 from tqdm import tqdm
 
+__version__ = '0.1.0'
+
 
 def save_pdf(pdf, o_path):
+    pdf.remove_unreferenced_resources()
     pdf.save(o_path, compress_streams=True, recompress_flate=True,
              linearize=True, stream_decode_level=StreamDecodeLevel.generalized,
              object_stream_mode=ObjectStreamMode.generate)
@@ -50,26 +53,25 @@ class JBIG2PDFOptimiser:
         self.df = pd.DataFrame()
 
     def _substitute_jb2global(self, target_obj, new_data, globals_obj):
-        keys_to_remove = [
-            '/Filter', '/DecodeParms', '/CCITTFaxDecode', '/K', '/Columns', '/Rows', '/BlackIs1',
-            '/Decode']
+        keys_to_remove = ['/CCITTFaxDecode', '/BlackIs1']
         for key in keys_to_remove:
             if key in target_obj:
                 del target_obj[key]
 
-        target_obj.write(new_data)
-        target_obj.Filter = pikepdf.Name('/JBIG2Decode')
-        target_obj.DecodeParms = self.pdf.make_indirect({
-            '/JBIG2Globals': globals_obj
-        })
+        jbig2_params = self.pdf.make_indirect({'/JBIG2Globals': globals_obj})
+        target_obj.write(new_data, filter=pikepdf.Name.JBIG2Decode, decode_parms=jbig2_params)
 
     def extract_images(self, tmp_dir: str):
         rows = []
         for obj_num in tqdm(range(1, len(self.pdf.objects)), desc='extracting images'):
             try:
                 obj = self.pdf.get_object(obj_num, 0)
-                if isinstance(obj, pikepdf.Stream) and obj.get('/Subtype') == '/Image' and \
-                        obj.get('/BitsPerComponent') == 1:
+                if isinstance(obj, pikepdf.Stream) and obj.Subtype == Name.Image \
+                        and obj.BitsPerComponent == 1:
+                    if Name.Decode in obj:
+                        # like ocrmypdf don't mess with custom decodes
+                        continue
+
                     img_id = len(rows)
                     pbm_path = path.join(tmp_dir, f'img_{img_id:06d}.pbm')
                     pikepdf.PdfImage(obj).as_pil_image().save(pbm_path)
@@ -84,7 +86,7 @@ class JBIG2PDFOptimiser:
 
     def compress_and_replace(self, tmp_dir: str):
         """By chunk create dictionary and re-encode images as JBIG2"""
-        chunks = np.array_split(self.df.index, int(np.ceil(len(self.df) / self.chunk_size)))
+        chunks = np.array_split(self.df.index, np.ceil(len(self.df) / self.chunk_size))
         pbar = tqdm(desc='encoding jbig2 images', total=len(self.df))
         for chunk_id, chunk_idx in enumerate(chunks):
             chunk_df = self.df.loc[chunk_idx]
@@ -134,7 +136,10 @@ if __name__ == '__main__':
 
     # parse arguments
     psr = argparse.ArgumentParser(
-        description='Replace 1-bit level images in a PDF with global dictionary JBIG2 compressed images')
+        prog='jb2_pdf_optimiser.py',
+        description='Recompress 1-bit images in PDFs with global dictionary JBIG2 images')
+    psr.add_argument(
+        '--version', action='version', version=f'%(prog)s {__version__}')
     psr.add_argument('input_pdf')
     psr.add_argument('output_pdf')
     psr.add_argument(
