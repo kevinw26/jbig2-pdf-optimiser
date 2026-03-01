@@ -181,4 +181,4 @@ cython_debug/
 .cursorindexingignore
 
 # testing data
-test
+test_data
