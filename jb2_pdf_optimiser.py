@@ -21,8 +21,8 @@ __version__ = '0.1.2'
 
 def save_pdf(pdf, o_path):
     pdf.remove_unreferenced_resources()
-    pdf.save(o_path, compress_streams=True, recompress_flate=True,
-             linearize=True, stream_decode_level=StreamDecodeLevel.generalized,
+    pdf.save(o_path, compress_streams=True, recompress_flate=True, linearize=True,
+             stream_decode_level=StreamDecodeLevel.generalized,
              object_stream_mode=ObjectStreamMode.generate)
 
 
@@ -177,8 +177,8 @@ if __name__ == '__main__':
         # | 0.9       | 259 | 36.21%      | -11.64%   |
         # | 1         | 406 |             | -75.00%   |
         #
-        # based on testing 0.8 is the smallest threshold without symbol substitution issues in the
-        # pdfs tested. 0.02 is added to be on the safe side
+        # based on testing, 0.8 is the smallest threshold without symbol substitution issues in the
+        # pdfs tested. 0.02 is added to be on the safe side; this may be too aggressive
         help='JBIG2 similarity threshold')
     psr.add_argument(
         '-c', '--chunk',
