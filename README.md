@@ -25,7 +25,7 @@ If a Python environment is already set up, then install the requirements (`uv pi
 python jb2_pdf_optimiser.py INPUT OUTPUT
 ```
 
-See further details with `-h`. The default JBIG2 threshold is `0.85` and the default chunk size is 128 images. The JBIG2 encoder must be installed for this to work. Further details can be found on OCRmyPDF's [help page](https://ocrmypdf.readthedocs.io/en/latest/jbig2.html). 
+See further details with `-h`. The default JBIG2 threshold is `0.82` and the default chunk size is 128 images. The JBIG2 encoder must be installed for this to work. Further details can be found on OCRmyPDF's [help page](https://ocrmypdf.readthedocs.io/en/latest/jbig2.html). 
 
 ## Comparison
 

@@ -4,6 +4,7 @@
 import argparse
 import os
 import shutil
+import warnings
 from os import path
 from subprocess import Popen, STDOUT, PIPE
 from tempfile import TemporaryDirectory
@@ -15,7 +16,7 @@ from pikepdf import ObjectStreamMode, Name
 from pikepdf import StreamDecodeLevel
 from tqdm import tqdm
 
-__version__ = '0.1.1'
+__version__ = '0.1.2'
 
 
 def save_pdf(pdf, o_path):
@@ -160,7 +161,25 @@ if __name__ == '__main__':
     psr.add_argument('output_pdf')
     psr.add_argument(
         '-t', '--threshold',
-        type=float, default=0.85, help='JBIG2 similarity threshold')
+        type=float, default=0.82,
+        # based on testing with real world scans, thresholds below 0.8 have high chances of
+        # substituting e -> c, especially with smaller font sizes (eg footnotes); at 0.75 these
+        # issues are prevalent. at 0.7 the symbol substitution errors intrude into the main text
+        #
+        # the thresholds have diminishing returns to compression:
+        #
+        # | threshold | kb  | incremental | diff      |
+        # |-----------|-----|-------------|-----------|
+        # | 0.7       | 195 | 2.99%       | 15.95%    |
+        # | 0.75      | 201 | 5.63%       | 13.36%    |
+        # | 0.8       | 213 | 8.19%       | 8.19%     |
+        # | 0.85      | 232 | 10.42%      | 0.00%     |
+        # | 0.9       | 259 | 36.21%      | -11.64%   |
+        # | 1         | 406 |             | -75.00%   |
+        #
+        # based on testing 0.8 is the smallest threshold without symbol substitution issues in the
+        # pdfs tested. 0.02 is added to be on the safe side
+        help='JBIG2 similarity threshold')
     psr.add_argument(
         '-c', '--chunk',
         type=int, default=128, help='Number of images per JBIG2 global dictionary')
@@ -176,6 +195,10 @@ if __name__ == '__main__':
             'Jbig2 executable not found. See https://ocrmypdf.readthedocs.io/en/latest/jbig2.html')
     if not path.isfile(args.input_pdf):
         psr.error(f'Input PDF does not exist')
+
+    # emit warnings if the JBIG2 similarity threshold is below 0.8
+    if args.threshold <= 0.8:
+        warnings.warn('JBIG2 thresholds below 0.8 have high changes of symbol substitution')
 
     JBIG2PDFOptimiser(
         input_pdf=args.input_pdf, output_pdf=args.output_pdf,
