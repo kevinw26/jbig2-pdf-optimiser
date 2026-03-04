@@ -13,6 +13,8 @@ Notes. Image dithering is outside the scope of this project. `ocrympdf` has drop
 
 ## Install and execute
 
+You must have the JBIG2 encoder installed. See [OCRmypdf for instructions](https://ocrmypdf.readthedocs.io/en/latest/jbig2.html) as to its installation.
+
 Clone or download the repository. I use [`uv`](https://github.com/astral-sh/uv). It can then be run, if you do not already have a Python environment set up, with:
 
 ```
