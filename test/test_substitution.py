@@ -49,7 +49,7 @@ if __name__ == '__main__':
         test_output = test_data.replace('unchanged.pdf', f'threshold_{threshold:.2f}.pdf')
         text_output = path.join('test_data', '_test_data_unchanged.txt') \
             .replace('unchanged.txt', f'threshold_{threshold:.2f}.txt')
-        JBIG2PDFOptimiser(test_data, test_output, jb2_threshold=threshold).optimize()
+        JBIG2PDFOptimiser(test_data, test_output, jb2_threshold=threshold).optimise()
         subprocess.run(
             ['ocrmypdf', '--sidecar', text_output, '--lang', 'eng+fra+lat', '--force-ocr',
              test_output, '/dev/null'])

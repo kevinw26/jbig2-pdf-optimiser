@@ -12,18 +12,13 @@ from tempfile import TemporaryDirectory
 import numpy as np
 import pandas as pd
 import pikepdf
-from pikepdf import ObjectStreamMode, Name
-from pikepdf import StreamDecodeLevel
+from pikepdf import Name
 from tqdm import tqdm
 
-__version__ = '0.1.2'
+import threshold_pdf
+from threshold_pdf import save_pdf
 
-
-def save_pdf(pdf, o_path):
-    pdf.remove_unreferenced_resources()
-    pdf.save(o_path, compress_streams=True, recompress_flate=True, linearize=True,
-             stream_decode_level=StreamDecodeLevel.generalized,
-             object_stream_mode=ObjectStreamMode.generate)
+__version__ = threshold_pdf.__version__
 
 
 class JBIG2PDFOptimiser:
@@ -62,7 +57,7 @@ class JBIG2PDFOptimiser:
         jbig2_params = self.pdf.make_indirect({'/JBIG2Globals': globals_obj})
         target_obj.write(new_data, filter=pikepdf.Name.JBIG2Decode, decode_parms=jbig2_params)
 
-    def extract_images(self, tmp_dir: str):
+    def extract_1bit_images(self, tmp_dir: str):
         rows = []
         for obj_num in tqdm(range(1, len(self.pdf.objects)), desc='extracting images from objects'):
             try:
@@ -120,9 +115,9 @@ class JBIG2PDFOptimiser:
                     self.df.loc[idx, 'jb2_gsize'] = len(symbol_data)
                     self._substitute_jb2global(row['obj_ptr'], compressed_data, jb2_globals)
 
-    def optimize(self, save_csv=None):
+    def optimise(self, save_csv=None):
         with TemporaryDirectory() as tmp_dir:
-            self.extract_images(tmp_dir)
+            self.extract_1bit_images(tmp_dir)
             if self.df.empty:
                 print('no 1-bit optimisable images found')
                 return
@@ -147,6 +142,8 @@ class JBIG2PDFOptimiser:
                     df.groupby('chunk')['jb2_gsize'].mean() / self.df.groupby('chunk').size())
             df['savings_pc'] = (1 - (df['jb2_est_size'] / df['orig_size'])).mul(100).round(2)
             df.to_csv(save_csv)
+
+        self.pdf.close()
 
 
 if __name__ == '__main__':
@@ -192,9 +189,11 @@ if __name__ == '__main__':
         psr.error(f'JBIG2 similarity threshold must be between 0.4 and 0.97')
     if shutil.which('jbig2') is None:
         psr.error(
-            'Jbig2 executable not found. See https://ocrmypdf.readthedocs.io/en/latest/jbig2.html')
+            'JBIG2 encoder not found. See https://ocrmypdf.readthedocs.io/en/latest/jbig2.html')
     if not path.isfile(args.input_pdf):
         psr.error(f'Input PDF does not exist')
+    if args.chunk <= 1:
+        psr.error(f'JBIG2 global dictionary chunk size must be greater than 1')
 
     # emit warnings if the JBIG2 similarity threshold is below 0.8
     if args.threshold <= 0.8:
@@ -203,4 +202,4 @@ if __name__ == '__main__':
     JBIG2PDFOptimiser(
         input_pdf=args.input_pdf, output_pdf=args.output_pdf,
         chunk_size=args.chunk, jb2_threshold=args.threshold
-    ).optimize(save_csv=args.diag_csv)
+    ).optimise(save_csv=args.diag_csv)

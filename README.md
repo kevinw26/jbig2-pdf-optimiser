@@ -3,27 +3,29 @@ Recompress 1-bit images in PDFs with global dictionary JBIG2 images. **These cha
 
 ## Why
 
-`ocrmypdf` and Acrobat use JBIG2 encoding for scans since it is more efficient that older CCITT Group 4. When in lossy mode, JBIG2 works like a set of stamps: instead of repeatedly providing a bitmap for every `e`, it creates a few stamps of `e` and then uses an `e` from that set of stamps whenever rendering an `e` is needed. This is inherently a lossy operation and it is possible for the stamps to get confused (symbol subtitution). See further details in comments in the [`jbig2enc`](https://github.com/agl/jbig2enc/commit/f1edbd89944910672d6759aecb999f9c34132e98#commitcomment-150178928) project.
+`ocrmypdf` and Acrobat use JBIG2 encoding for 1-bit scans, ie pixels that are all black or all white, since it is more efficient that older CCITT Group 4. When in lossy mode, JBIG2 works like a set of stamps: instead of repeatedly providing a bitmap for every `e`, it creates a few stamps of `e` and then uses an `e` from that set of stamps whenever rendering an `e` is needed. This is inherently a lossy operation and it is possible for the stamps to get confused (symbol subtitution). See further details in comments in the [`jbig2enc`](https://github.com/agl/jbig2enc/commit/f1edbd89944910672d6759aecb999f9c34132e98#commitcomment-150178928) project.
 
 Most often the symbol dictionary (the set of stamps) is only constructed at a single-image level. JBIG2, however, also supports a global mode which can save more space by combining symbol dictionaries across images. The optimiser extracts 1-bit images across pages in a PDF. It then re-encodes them in JBIG2 in chunks that share a global dictionary. By default the chunks are 128 images large. 
 
 It then replaces the original 1-bit images in the PDF with the new global dictionary JBIG2 images. This can reduce file size considerably without substantial loss of amenity, provided that symbol similarity thresholds are chosen carefully to avoid symbol substitution.
 
-Notes. Image dithering is outside the scope of this project. `ocrympdf` has dropped support for lossy JBIG2 compression.
+## Instructions
 
-## Install and execute
+You must have the JBIG2 encoder installed. See [OCRmypdf for instructions](https://ocrmypdf.readthedocs.io/en/latest/jbig2.html) as to its installation. 
 
-You must have the JBIG2 encoder installed. See [OCRmypdf for instructions](https://ocrmypdf.readthedocs.io/en/latest/jbig2.html) as to its installation.
+Check that PDF images are in 1-bit mode first with `threshold_pdf.py --catalogue-only THE_PDF`; if not, `threshold_pdf.py THE_PDF OUTPUT_PDF` can substitute the relevant images with 1-bit lossless JBIG2 versions. JBIG2 PDF optimiser only replaces 1-bit images. 
 
-Clone or download the repository. I use [`uv`](https://github.com/astral-sh/uv). It can then be run, if you do not already have a Python environment set up, with:
+Clone or download the repository. I use [`uv`](https://github.com/astral-sh/uv). The scripts can be run, if you do not already have a Python environment set up, with:
 
 ```
+uv run threshold_pdf.py INPUT OUTPUT  # if the PDF is not yet 1-bit
 uv run jb2_pdf_optimiser.py INPUT OUTPUT
 ```
 
 If a Python environment is already set up, then install the requirements (`uv pip install -r pyproject.toml` in the relevant folder or `uv sync`), and execute:
 
 ```
+python threshold_pdf.py INPUT OUTPUT
 python jb2_pdf_optimiser.py INPUT OUTPUT
 ```
 
