@@ -115,7 +115,8 @@ def extract_all_images(
                     }
                     if extract_to is not None:
                         output_path = path.join(extract_to, f'img_{img_id:06d}.tif')
-                        pikepdf.PdfImage(obj).as_pil_image().save(output_path)
+                        pikepdf.PdfImage(obj).as_pil_image().save(
+                            output_path, compression='tiff_deflate')
                         d['output_path'] = output_path
                     rows.append(d)
                     img_id += 1

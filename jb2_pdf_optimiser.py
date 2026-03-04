@@ -39,11 +39,12 @@ class JBIG2PDFOptimiser:
         return diffs
 
     def __init__(self, input_pdf: str, output_pdf: str, chunk_size: int = 128,
-                 jb2_threshold: float = 0.8):
+                 jb2_threshold: float = 0.8, keep_tempdir=False):
         self.input_pdf = input_pdf
         self.output_pdf = output_pdf
         self.chunk_size = chunk_size
         self.jb2_threshold = jb2_threshold
+        self.keep_tempdir = keep_tempdir
 
         self.pdf = pikepdf.Pdf.open(input_pdf)
         self.df = pd.DataFrame()
@@ -69,11 +70,11 @@ class JBIG2PDFOptimiser:
                         continue
 
                     img_id = len(rows)
-                    pbm_path = path.join(tmp_dir, f'img_{img_id:06d}.pbm')
-                    pikepdf.PdfImage(obj).as_pil_image().save(pbm_path)
+                    out_path = path.join(tmp_dir, f'img_{img_id:06d}.tif')
+                    pikepdf.PdfImage(obj).as_pil_image().save(out_path, compression="group4")
                     rows.append({
                         'obj_ptr'  : obj,
-                        'pbm_path' : pbm_path,
+                        'out_path' : out_path,
                         'orig_size': len(obj.read_raw_bytes())
                     })
             except (AttributeError, KeyError, pikepdf.PdfError):
@@ -91,17 +92,23 @@ class JBIG2PDFOptimiser:
             chunk_dir = path.join(tmp_dir, f'chunk_{chunk_id}')
             os.makedirs(chunk_dir)
 
-            pbm_files = chunk_df['pbm_path'].to_list()
+            lines = []
+            pbm_files = chunk_df['out_path'].to_list()
             with Popen(
                     ['jbig2', '-s', '-p', '-t', f'{self.jb2_threshold:.2f}', '-v', *pbm_files],
                     stdout=PIPE, stderr=STDOUT, text=True, bufsize=1, cwd=chunk_dir
             ) as proc:
                 for line in proc.stdout:
+                    lines.append(line)
                     if line.startswith('thresholded'):
                         # update progress bar as images are encoded; replacement is fast
                         pbar.update()
 
             sym_file = path.join(chunk_dir, 'output.sym')
+            if not path.exists(sym_file):
+                raise RuntimeError(
+                    f'cannot find symbolic output file for chunk {chunk_idx}; printing JBIG2 '
+                    f'encoder log:\n{''.join(lines)}')
             with open(sym_file, 'rb') as f:
                 symbol_data = f.read()
                 jb2_globals = self.pdf.make_stream(symbol_data)
@@ -116,7 +123,9 @@ class JBIG2PDFOptimiser:
                     self._substitute_jb2global(row['obj_ptr'], compressed_data, jb2_globals)
 
     def optimise(self, save_csv=None):
-        with TemporaryDirectory() as tmp_dir:
+        with TemporaryDirectory(delete=not self.keep_tempdir) as tmp_dir:
+            if self.keep_tempdir:
+                print(f'temporary directory at {tmp_dir}')
             self.extract_1bit_images(tmp_dir)
             if self.df.empty:
                 print('no 1-bit optimisable images found')
@@ -135,7 +144,7 @@ class JBIG2PDFOptimiser:
             # clean up chunk from float to int64
             df = self.df.drop(columns=['obj_ptr'])
             df['chunk'] = df['chunk'].astype('Int64')
-            df = df.set_index(['chunk', 'pbm_path'])
+            df = df.set_index(['chunk', 'out_path'])
 
             # calc estimated savings
             df['jb2_est_size'] = df['jb2_lsize'] + (
@@ -182,6 +191,8 @@ if __name__ == '__main__':
         type=int, default=128, help='Number of images per JBIG2 global dictionary')
     psr.add_argument(
         '--diag-csv', type=str, default=None, help='Path to output CSV with image data')
+    psr.add_argument('--keep-tempdirs', action='store_true',
+                     help='Print temporary directory location and do not delete on close')
     args = psr.parse_args()
 
     # validate inputs
@@ -201,5 +212,5 @@ if __name__ == '__main__':
 
     JBIG2PDFOptimiser(
         input_pdf=args.input_pdf, output_pdf=args.output_pdf,
-        chunk_size=args.chunk, jb2_threshold=args.threshold
+        chunk_size=args.chunk, jb2_threshold=args.threshold, keep_tempdir=args.keep_tempdirs
     ).optimise(save_csv=args.diag_csv)
