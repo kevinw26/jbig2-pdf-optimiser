@@ -19,7 +19,7 @@ from skimage.filters import threshold_sauvola
 from skimage.util import img_as_ubyte
 from tqdm import tqdm
 
-__version__ = '0.2.0'
+__version__ = '0.2.1'
 
 WORKERS = max(multiprocessing.cpu_count() - 1, 1)
 FILTER_NAMES = {
