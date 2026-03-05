@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3
 
 import argparse
+import multiprocessing as mp
 import os
 import shutil
 import warnings
@@ -156,6 +157,7 @@ class JBIG2PDFOptimiser:
 
 
 if __name__ == '__main__':
+    mp.set_start_method('spawn')
 
     # parse arguments
     psr = argparse.ArgumentParser(

@@ -1,6 +1,7 @@
 import argparse
 import gc
 import multiprocessing
+import multiprocessing as mp
 import shutil
 import subprocess
 import sys
@@ -116,7 +117,9 @@ def extract_all_images(
             objs = page.get("/Resources", {}).get("/XObject", {})
             for name, obj in objs.items():
                 try:
-                    if isinstance(obj, pikepdf.Stream) and obj.Subtype == Name.Image and is_identity_decode(obj):
+                    if isinstance(obj,
+                                  pikepdf.Stream) and obj.Subtype == Name.Image and is_identity_decode(
+                        obj):
                         # inspired by ocrmypdf: don't mess with non-identity decodes
                         if img_id in skip:
                             img_id += 1  # consistent indexing
@@ -136,10 +139,12 @@ def extract_all_images(
                             pil_image = pikepdf.PdfImage(obj).as_pil_image()
                             if WORKERS > 1:
                                 ff.append(ex.submit(
-                                    save_image, pil_image.mode, pil_image.size, pil_image.tobytes(), output_path))
+                                    save_image, pil_image.mode, pil_image.size, pil_image.tobytes(),
+                                    output_path))
                             else:
                                 # if single threaded ignore the executor
-                                save_image(pil_image.mode, pil_image.size, pil_image.tobytes(), output_path)
+                                save_image(pil_image.mode, pil_image.size, pil_image.tobytes(),
+                                           output_path)
                             d['output_path'] = output_path
                         rows.append(d)
                         img_id += 1
@@ -172,7 +177,8 @@ def extract_all_images(
 def local_threshold_image(img, threshold=None):
     with tempfile.NamedTemporaryFile(suffix='.tif') as temp_file:
         pixel_array = convert_to_rbg(Image.open(img))
-        imageio.imwrite(temp_file.name, img_as_ubyte(pixel_array > threshold_sauvola(pixel_array)), compression=8)
+        imageio.imwrite(temp_file.name, img_as_ubyte(pixel_array > threshold_sauvola(pixel_array)),
+                        compression=8)
         del pixel_array
         jb2_call = subprocess.run(['jbig2', '-p', temp_file.name], capture_output=True, check=True)
         return jb2_call.stdout
@@ -274,6 +280,8 @@ class PDFThresholder:
 
 
 if __name__ == '__main__':
+
+    mp.set_start_method('spawn')
     psr = argparse.ArgumentParser(
         description='Turn images in a PDF file into 1-bit images. By default uses local adaptive '
                     'thresholding.')
