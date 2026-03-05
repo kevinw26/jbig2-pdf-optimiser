@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 import pikepdf
 from pikepdf import Name
-from tqdm import tqdm
+from tqdm.rich import tqdm
 
 import threshold_pdf
 from threshold_pdf import save_pdf

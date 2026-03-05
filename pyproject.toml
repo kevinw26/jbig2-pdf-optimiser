@@ -7,5 +7,6 @@ dependencies = [
     "pikepdf",
     "pandas",
     "tqdm",
-    "scikit-image"
+    "scikit-image",
+    "rich"
 ]

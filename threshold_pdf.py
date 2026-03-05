@@ -19,7 +19,7 @@ from PIL.Image import Dither
 from pikepdf import Name, StreamDecodeLevel, ObjectStreamMode
 from skimage.filters import threshold_sauvola
 from skimage.util import img_as_ubyte
-from tqdm import tqdm
+from tqdm.rich import tqdm
 
 __version__ = '0.2.3'
 
