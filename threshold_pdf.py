@@ -1,4 +1,5 @@
 import argparse
+import gc
 import multiprocessing
 import shutil
 import subprocess
@@ -8,10 +9,10 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from os import path
 from typing import List
 
+import imageio
 import numpy as np
 import pandas as pd
 import pikepdf
-import skimage
 from PIL import Image
 from PIL.Image import Dither
 from pikepdf import Name, StreamDecodeLevel, ObjectStreamMode
@@ -19,18 +20,22 @@ from skimage.filters import threshold_sauvola
 from skimage.util import img_as_ubyte
 from tqdm import tqdm
 
-__version__ = '0.2.2'
+__version__ = '0.2.3'
 
 WORKERS = max(multiprocessing.cpu_count() - 1, 1)
 FILTER_NAMES = {
-    '/DCTDecode'      : 'JPEG',
-    '/JPXDecode'      : 'JPEG2000',
-    '/JBIG2Decode'    : 'JBIG2',
-    '/FlateDecode'    : 'FlateDecode (PNG/zlib)',
-    '/LZWDecode'      : 'LZW',
-    '/CCITTFaxDecode' : 'CCITT Fax',
+    '/DCTDecode': 'JPEG',
+    '/JPXDecode': 'JPEG2000',
+    '/JBIG2Decode': 'JBIG2',
+    '/FlateDecode': 'FlateDecode (PNG/zlib)',
+    '/LZWDecode': 'LZW',
+    '/CCITTFaxDecode': 'CCITT Fax',
     '/RunLengthDecode': 'RLE',
 }
+
+
+def save_image(image_mode, image_size, some_bytes, output_path):
+    Image.frombytes(image_mode, image_size, some_bytes).save(output_path)
 
 
 def is_identity_decode(obj) -> bool:
@@ -85,6 +90,19 @@ def convert_to_rbg(img: Image.Image) -> np.ndarray:
     return np.array(img)
 
 
+class BoundedProcessPoolExecutor(ProcessPoolExecutor):
+    # https://stackoverflow.com/a/78071937
+    def __init__(self, max_queue=WORKERS * 3, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.semaphore = multiprocessing.Semaphore(max_queue)
+
+    def submit(self, *args, **kwargs):
+        self.semaphore.acquire()
+        future = super().submit(*args, **kwargs)
+        future.add_done_callback(lambda _: self.semaphore.release())
+        return future
+
+
 def extract_all_images(
         pdf_object: pikepdf.Pdf, extract_to=None, print_catalogue=False,
         skip: List = None) -> pd.DataFrame:
@@ -92,36 +110,55 @@ def extract_all_images(
 
     img_id = 0
     rows = []
-    for page_num, page in enumerate(tqdm(pdf_object.pages, desc='reading images from pages')):
-        objs = page.get("/Resources", {}).get("/XObject", {})
-        for name, obj in objs.items():
-            try:
-                if isinstance(obj, pikepdf.Stream) and obj.Subtype == Name.Image:
-                    if not is_identity_decode(obj):
-                        # don't mess with non-identity decodes
-                        continue
-                    if img_id in skip:
-                        img_id += 1
-                        continue
+    with BoundedProcessPoolExecutor(max_workers=WORKERS) as ex:
+        ff = []
+        for page_num, page in enumerate(tqdm(pdf_object.pages, desc='reading images from pages')):
+            objs = page.get("/Resources", {}).get("/XObject", {})
+            for name, obj in objs.items():
+                try:
+                    if isinstance(obj, pikepdf.Stream) and obj.Subtype == Name.Image and is_identity_decode(obj):
+                        # inspired by ocrmypdf: don't mess with non-identity decodes
+                        if img_id in skip:
+                            img_id += 1  # consistent indexing
+                            continue
 
-                    cs, enc = get_image_info(obj)
-                    d = {
-                        'page'     : page_num,
-                        'index'    : img_id,
-                        'pointer'  : obj,
-                        'orig_size': len(obj.read_raw_bytes()),
-                        'colour'   : cs,
-                        'encoding' : enc
-                    }
-                    if extract_to is not None:
-                        output_path = path.join(extract_to, f'img_{img_id:06d}.png')
-                        pikepdf.PdfImage(obj).as_pil_image().save(output_path)
-                        d['output_path'] = output_path
-                    rows.append(d)
-                    img_id += 1
-            except (AttributeError, KeyError, pikepdf.PdfError):
-                pass
-    catalogue_df = pd.DataFrame(rows)
+                        cs, enc = get_image_info(obj)
+                        d = {
+                            'page': page_num,
+                            'index': img_id,
+                            'pointer': obj,
+                            'orig_size': len(obj.read_raw_bytes()),
+                            'colour': cs,
+                            'encoding': enc
+                        }
+                        if extract_to is not None:
+                            output_path = path.join(extract_to, f'img_{img_id:06d}.png')
+                            pil_image = pikepdf.PdfImage(obj).as_pil_image()
+                            if WORKERS > 1:
+                                ff.append(ex.submit(
+                                    save_image, pil_image.mode, pil_image.size, pil_image.tobytes(), output_path))
+                            else:
+                                # if single threaded ignore the executor
+                                save_image(pil_image.mode, pil_image.size, pil_image.tobytes(), output_path)
+                            d['output_path'] = output_path
+                        rows.append(d)
+                        img_id += 1
+                except (AttributeError, KeyError, pikepdf.PdfError):
+                    pass
+        catalogue_df = pd.DataFrame(rows)
+
+        # check results; progress bar unnecessary
+        if len(ff) > 0:
+            if extract_to is None:
+                raise ValueError('image extraction not requested but extraction jobs queued???')
+            tqdm.write('waiting for intermediate files to finish writing', end=' ... ')
+            try:
+                for f in as_completed(ff):
+                    f.result()
+            except Exception as e:
+                ex.shutdown(wait=False, cancel_futures=True)
+                raise e
+            tqdm.write('done')
 
     if print_catalogue:
         more_drop = ['output_path'] if extract_to is None else []
@@ -135,8 +172,8 @@ def extract_all_images(
 def local_threshold_image(img, threshold=None):
     with tempfile.NamedTemporaryFile(suffix='.tif') as temp_file:
         pixel_array = convert_to_rbg(Image.open(img))
-        thresholded = img_as_ubyte(pixel_array > threshold_sauvola(pixel_array))
-        Image.fromarray(thresholded).save(temp_file.name, compression="group4")
+        imageio.imwrite(temp_file.name, img_as_ubyte(pixel_array > threshold_sauvola(pixel_array)), compression=8)
+        del pixel_array
         jb2_call = subprocess.run(['jbig2', '-p', temp_file.name], capture_output=True, check=True)
         return jb2_call.stdout
 
@@ -146,6 +183,7 @@ def dither_image(img, threshold=None):
         the_image = Image.open(img)
         the_image.convert('1', dither=Dither.FLOYDSTEINBERG).save(
             temp_file.name, compression='group4')
+        del the_image
         jb2_call = subprocess.run(['jbig2', '-p', temp_file.name], capture_output=True, check=True)
         return jb2_call.stdout
 
@@ -153,8 +191,8 @@ def dither_image(img, threshold=None):
 def global_threshold_image(img, threshold=0.5):
     with tempfile.NamedTemporaryFile(suffix='.tif') as temp_file:
         pixel_array = convert_to_rbg(Image.open(img))
-        thresholded = img_as_ubyte(pixel_array > threshold)
-        Image.fromarray(thresholded).save(temp_file.name, compression="group4")
+        imageio.imwrite(temp_file.name, img_as_ubyte(pixel_array > threshold), compression=8)
+        del pixel_array
         jb2_call = subprocess.run(['jbig2', '-p', temp_file.name], capture_output=True, check=True)
         return jb2_call.stdout
 
@@ -162,8 +200,8 @@ def global_threshold_image(img, threshold=0.5):
 def save_pdf(the_pdf, o_path):
     the_pdf.remove_unreferenced_resources()
     the_pdf.save(o_path, compress_streams=True, recompress_flate=True, linearize=True,
-             stream_decode_level=StreamDecodeLevel.generalized,
-             object_stream_mode=ObjectStreamMode.generate)
+                 stream_decode_level=StreamDecodeLevel.generalized,
+                 object_stream_mode=ObjectStreamMode.generate)
 
 
 class PDFThresholder:
@@ -199,6 +237,8 @@ class PDFThresholder:
 
         with tempfile.TemporaryDirectory() as temp_dir:
             catalogue_df = extract_all_images(self.pdf, extract_to=temp_dir, skip=self.skip)
+            gc.collect()  # clean up memory if possible
+
             method_to_use = (
                 local_threshold_image if self.method == 'sauvola' else
                 dither_image if self.method == 'dither' else
