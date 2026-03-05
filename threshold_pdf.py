@@ -92,7 +92,7 @@ def convert_to_rbg(img: Image.Image) -> np.ndarray:
 
 class BoundedProcessPoolExecutor(ProcessPoolExecutor):
     # https://stackoverflow.com/a/78071937
-    def __init__(self, max_queue=WORKERS * 3, *args, **kwargs):
+    def __init__(self, max_queue=WORKERS * 2, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.semaphore = multiprocessing.Semaphore(max_queue)
 
