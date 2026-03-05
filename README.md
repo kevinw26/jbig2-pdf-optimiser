@@ -35,10 +35,11 @@ See further details with `-h`. The default JBIG2 threshold is `0.82` and the def
 
 Try this with your own PDFs, but these are some file size statistics based on book scans. The test cases are denominated in terms of the number of images and their format, here mostly pages. These test cases used a symbol similarity threshold of 0.8.
 
-| Test case              | Original | Adobe Acrobat  | JBIG2 PDF Optimizer |
-| :--------------------- | :------- | :------------- | :------------------ |
+| Test case              | Original | Adobe Acrobat  | JBIG2 PDF Optimiser |
+| :--------------------- | :------- |:---------------|:--------------------|
 | 1 JPG + 141 CCITT G4   | 9.23 MB  | 1.77 MB (-81%) | 1.46 MB (-85%)      |
 | 1018 local JBIG2 et al | 19.5 MB  | Error          | 13.0 MB (-33%)      |
 | 1 JPG + 484 CCITT G4   | 19.1 MB  | 7.59 MB (-61%) | 4.51 MB (-76%)      |
+| 840 JPG (colour)       | 951.0 MB | 913.8 MB (-4%) | 30.5 MB (-97%)      |
 
 The 1080 local JBIG2 PDF emitted an image processing error when compression was attempted in Adobe Acrobat (versions 11 and DC 2025).
