@@ -19,7 +19,7 @@ from skimage.filters import threshold_sauvola
 from skimage.util import img_as_ubyte
 from tqdm import tqdm
 
-__version__ = '0.2.1'
+__version__ = '0.2.2'
 
 WORKERS = max(multiprocessing.cpu_count() - 1, 1)
 FILTER_NAMES = {
@@ -116,7 +116,7 @@ def extract_all_images(
                     if extract_to is not None:
                         output_path = path.join(extract_to, f'img_{img_id:06d}.tif')
                         pikepdf.PdfImage(obj).as_pil_image().save(
-                            output_path, compression='tiff_deflate')
+                            output_path, compression='zstd')
                         d['output_path'] = output_path
                     rows.append(d)
                     img_id += 1
