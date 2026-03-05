@@ -24,12 +24,12 @@ __version__ = '0.2.3'
 
 WORKERS = max(multiprocessing.cpu_count() - 1, 1)
 FILTER_NAMES = {
-    '/DCTDecode': 'JPEG',
-    '/JPXDecode': 'JPEG2000',
-    '/JBIG2Decode': 'JBIG2',
-    '/FlateDecode': 'FlateDecode (PNG/zlib)',
-    '/LZWDecode': 'LZW',
-    '/CCITTFaxDecode': 'CCITT Fax',
+    '/DCTDecode'      : 'JPEG',
+    '/JPXDecode'      : 'JPEG2000',
+    '/JBIG2Decode'    : 'JBIG2',
+    '/FlateDecode'    : 'FlateDecode (PNG/zlib)',
+    '/LZWDecode'      : 'LZW',
+    '/CCITTFaxDecode' : 'CCITT Fax',
     '/RunLengthDecode': 'RLE',
 }
 
@@ -124,12 +124,12 @@ def extract_all_images(
 
                         cs, enc = get_image_info(obj)
                         d = {
-                            'page': page_num,
-                            'index': img_id,
-                            'pointer': obj,
+                            'page'     : page_num,
+                            'index'    : img_id,
+                            'pointer'  : obj,
                             'orig_size': len(obj.read_raw_bytes()),
-                            'colour': cs,
-                            'encoding': enc
+                            'colour'   : cs,
+                            'encoding' : enc
                         }
                         if extract_to is not None:
                             output_path = path.join(extract_to, f'img_{img_id:06d}.png')
