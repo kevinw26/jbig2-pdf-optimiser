@@ -135,8 +135,8 @@ def extract_all_images(
 def local_threshold_image(img, threshold=None):
     with tempfile.NamedTemporaryFile(suffix='.tif') as temp_file:
         pixel_array = convert_to_rbg(Image.open(img))
-        skimage.io.imsave(
-            temp_file.name, img_as_ubyte(pixel_array > threshold_sauvola(pixel_array)))
+        thresholded = img_as_ubyte(pixel_array > threshold_sauvola(pixel_array))
+        Image.fromarray(thresholded).save(temp_file.name, compression="group4")
         jb2_call = subprocess.run(['jbig2', '-p', temp_file.name], capture_output=True, check=True)
         return jb2_call.stdout
 
@@ -144,7 +144,8 @@ def local_threshold_image(img, threshold=None):
 def dither_image(img, threshold=None):
     with tempfile.NamedTemporaryFile(suffix='.tif') as temp_file:
         the_image = Image.open(img)
-        the_image.convert('1', dither=Dither.FLOYDSTEINBERG).save(temp_file.name)
+        the_image.convert('1', dither=Dither.FLOYDSTEINBERG).save(
+            temp_file.name, compression='group4')
         jb2_call = subprocess.run(['jbig2', '-p', temp_file.name], capture_output=True, check=True)
         return jb2_call.stdout
 
@@ -152,14 +153,15 @@ def dither_image(img, threshold=None):
 def global_threshold_image(img, threshold=0.5):
     with tempfile.NamedTemporaryFile(suffix='.tif') as temp_file:
         pixel_array = convert_to_rbg(Image.open(img))
-        skimage.io.imsave(temp_file.name, img_as_ubyte(pixel_array > threshold))
+        thresholded = img_as_ubyte(pixel_array > threshold)
+        Image.fromarray(thresholded).save(temp_file.name, compression="group4")
         jb2_call = subprocess.run(['jbig2', '-p', temp_file.name], capture_output=True, check=True)
         return jb2_call.stdout
 
 
-def save_pdf(pdf, o_path):
-    pdf.remove_unreferenced_resources()
-    pdf.save(o_path, compress_streams=True, recompress_flate=True, linearize=True,
+def save_pdf(the_pdf, o_path):
+    the_pdf.remove_unreferenced_resources()
+    the_pdf.save(o_path, compress_streams=True, recompress_flate=True, linearize=True,
              stream_decode_level=StreamDecodeLevel.generalized,
              object_stream_mode=ObjectStreamMode.generate)
 
